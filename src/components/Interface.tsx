@@ -42,14 +42,14 @@ export function Interface({ meter }: { meter: RefObject<HTMLElement> }) {
         <p className={entered ? 'is-hidden' : ''}>An interactive specimen</p>
       </div>
 
-      {/* One rail in the corner: the label, then the progress rule. */}
+      {/* One rail in the corner: the progress rule, then the label. */}
       <div className="ui__corner">
-        <About />
         <span className="ui__meter" aria-hidden="true">
           <span className="ui__meter-bar">
             <i ref={meter} />
           </span>
         </span>
+        <About />
       </div>
 
       <p className={`ui__hint${HINTS[stage] ? '' : ' is-hidden'}`} aria-live="polite">

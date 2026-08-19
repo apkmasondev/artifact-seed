@@ -29,6 +29,8 @@ export const MEDIA = {
   hands: asset('artifact/hand-foreground.webp'),
   handsLit: asset('artifact/hand-foreground-lit.webp'),
   reference: asset('artifact/artifact-seed-reference.webp'),
+  /** The generated concept sheet the whole object was designed against. */
+  conceptSheet: asset('artifact/concept-sheet.webp'),
 }
 
 /**

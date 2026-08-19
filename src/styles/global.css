@@ -402,7 +402,7 @@ body {
   visibility: hidden;
 }
 
-/* Shares the corner rail with the progress rule, to its left. */
+/* Shares the corner rail with the progress rule, to its right. */
 .ui__about {
   pointer-events: auto;
   appearance: none;
@@ -439,12 +439,14 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  background: rgba(0, 0, 0, 0.9);
-  -webkit-backdrop-filter: blur(18px) saturate(0.8);
-  backdrop-filter: blur(18px) saturate(0.8);
+  /* Not opaque: the scene stays faintly present behind the sheet, so this
+     reads as a layer over the piece rather than a different page. */
+  background: rgba(0, 0, 0, 0.86);
+  -webkit-backdrop-filter: blur(26px) saturate(0.75);
+  backdrop-filter: blur(26px) saturate(0.75);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 480ms ease, visibility 0s linear 480ms;
+  transition: opacity 520ms ease, visibility 0s linear 520ms;
 }
 
 .about::-webkit-scrollbar {
@@ -455,42 +457,45 @@ body {
 .about.is-open {
   opacity: 1;
   visibility: visible;
-  transition: opacity 480ms ease, visibility 0s;
+  transition: opacity 520ms ease, visibility 0s;
 }
 
-/*
- * Deliberately not the house voice. Everything else on screen is tracked
- * uppercase; an explanation has to be readable, so this is normal case at a
- * normal measure.
- */
 .about__sheet {
-  max-width: 56ch;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: clamp(56px, 12vh, 128px) max(28px, 6vw) clamp(48px, 10vh, 96px);
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: clamp(15px, 1.15vw, 17px);
-  line-height: 1.65;
-  color: rgba(242, 240, 236, 0.72);
+  padding: clamp(30px, 6vh, 68px) max(28px, 5vw) clamp(48px, 10vh, 96px);
 }
 
-.about__sheet p {
-  margin: 0 0 1.35em;
+/* ---- header rail ---- */
+
+.about__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2em;
+  padding-bottom: 1.6em;
+  border-bottom: 1px solid rgba(242, 240, 236, 0.14);
+}
+
+.about__mark {
+  margin: 0;
+  font-size: var(--ui-size);
+  font-weight: 500;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 
 .about__close {
-  position: absolute;
-  right: max(28px, 4vw);
-  top: max(26px, 4.4vh);
   appearance: none;
   border: 0;
   background: none;
   color: var(--ink-faint);
-  font-family: var(--ui-font);
+  font: inherit;
   font-size: var(--ui-size);
   letter-spacing: var(--ui-track);
   text-transform: uppercase;
-  padding: 0.6em 0;
+  padding: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -516,73 +521,178 @@ body {
   width: clamp(26px, 4.4vw, 56px);
 }
 
-.about__mark {
-  margin: 0 0 0.9rem;
-  font-size: var(--ui-size);
-  font-weight: 500;
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
+/* ---- lead ---- */
 
+/*
+ * From here down the house voice is deliberately dropped. Everything else on
+ * screen is tracked uppercase four words at a time, which is right for a
+ * caption and wrong for an explanation.
+ */
 .about__lead {
-  font-size: 1.28em;
-  line-height: 1.45;
+  margin: clamp(1.4em, 5vh, 2.4em) 0 clamp(1.6em, 6vh, 3em);
+  max-width: 22ch;
+  font-size: clamp(26px, 3.4vw, 46px);
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  font-weight: 400;
   color: var(--ink);
-  margin-bottom: 1.6em !important;
+  text-transform: none;
 }
 
-.about__sheet h3 {
-  margin: 2.4em 0 0.9em;
+/* ---- label / body rows ---- */
+
+.about__row {
+  display: grid;
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  gap: 1.2em 3.2em;
+  padding: clamp(1.5em, 3.4vh, 2.3em) 0;
+  border-top: 1px solid rgba(242, 240, 236, 0.09);
+}
+
+.about__row h2 {
+  margin: 0;
   font-size: var(--ui-size);
   font-weight: 500;
   letter-spacing: var(--ui-track);
   text-transform: uppercase;
-  color: rgba(242, 240, 236, 0.55);
+  color: rgba(242, 240, 236, 0.42);
+  padding-top: 0.35em;
 }
 
-.about__list {
-  margin: 0 0 1.35em;
+.about__body {
+  max-width: 60ch;
+  font-size: clamp(15px, 1.05vw, 17px);
+  line-height: 1.7;
+  letter-spacing: normal;
+  text-transform: none;
+  color: rgba(242, 240, 236, 0.7);
+}
+
+.about__body--wide {
+  max-width: none;
+}
+
+.about__body p {
+  margin: 0 0 1.1em;
+}
+
+.about__body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- key list ---- */
+
+.about__keys {
+  margin: 0;
   display: grid;
-  grid-template-columns: minmax(5.5em, auto) 1fr;
-  gap: 0.5em 1.6em;
+  grid-template-columns: minmax(4.5em, auto) minmax(0, 1fr);
+  gap: 0.85em 2.2em;
 }
 
-.about__list dt {
+.about__keys dt {
   color: var(--ink);
 }
 
-.about__list dd {
+.about__keys dd {
   margin: 0;
 }
 
+/* ---- the concept sheet ---- */
+
+.about__figure {
+  margin: 0;
+}
+
+.about__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(242, 240, 236, 0.1);
+}
+
+.about__figure figcaption {
+  max-width: 60ch;
+  margin-top: 1.1em;
+  font-size: 0.88em;
+  line-height: 1.6;
+  color: rgba(242, 240, 236, 0.45);
+}
+
+/* ---- materials, echoing the concept sheet ---- */
+
+.about__materials {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5em, 1fr));
+  gap: 0.7em 2.2em;
+}
+
+.about__materials li {
+  display: flex;
+  align-items: center;
+  gap: 0.85em;
+  font-size: var(--ui-size);
+  letter-spacing: var(--ui-track);
+  text-transform: uppercase;
+  color: rgba(242, 240, 236, 0.62);
+  white-space: nowrap;
+}
+
+.about__materials i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(242, 240, 236, 0.18);
+}
+
+/* ---- credit ---- */
+
 .about__credit {
-  margin-top: 2.6em !important;
-  padding-top: 1.6em;
-  border-top: 1px solid rgba(242, 240, 236, 0.12);
-  color: rgba(242, 240, 236, 0.5);
+  display: flex;
+  align-items: baseline;
+  gap: 0.8em;
+  margin-top: clamp(1.6em, 5vh, 2.8em);
+  padding-top: 1.8em;
+  border-top: 1px solid rgba(242, 240, 236, 0.14);
+  font-size: var(--ui-size);
+  letter-spacing: var(--ui-track);
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 .about a {
   color: var(--ink);
   text-decoration: none;
-  border-bottom: 1px solid rgba(242, 240, 236, 0.32);
-  padding-bottom: 1px;
-  transition: border-color 260ms ease;
+  border-bottom: 1px solid rgba(242, 240, 236, 0.3);
+  padding-bottom: 2px;
+  transition: border-color 260ms ease, color 260ms ease;
 }
 
 .about a:hover {
   border-bottom-color: var(--warm);
+  color: var(--warm);
 }
 
-@media (max-width: 560px) {
-  .about__list {
-    grid-template-columns: 1fr;
+@media (max-width: 720px) {
+  .about__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.9em;
+  }
+
+  .about__row h2 {
+    padding-top: 0;
+  }
+
+  .about__keys {
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.15em;
   }
 
-  .about__list dd {
-    margin-bottom: 1em;
+  .about__keys dd {
+    margin-bottom: 0.9em;
   }
 }
 

@@ -1,0 +1,19 @@
+node_modules
+dist
+.work
+*.local
+.env
+.env.local
+*.tsbuildinfo
+.DS_Store
+.claude/
+
+# Working material, not deliverables. The camera-original masters are re-encoded
+# into public/media, the brief is not part of the product, and the concept art
+# already ships distilled as public/artifact/artifact-seed-reference.webp.
+/Figure_*.mp4
+/Woman_*.mp4
+/Zapisana_klatka_*.jpeg
+/Titanium*.mp3
+/PLAN.md*
+/object webgl.png

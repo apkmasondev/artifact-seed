@@ -529,13 +529,19 @@ body {
  * caption and wrong for an explanation.
  */
 .about__lead {
-  margin: clamp(1.4em, 5vh, 2.4em) 0 clamp(1.6em, 6vh, 3em);
-  max-width: 22ch;
-  font-size: clamp(26px, 3.4vw, 46px);
-  line-height: 1.18;
-  letter-spacing: -0.015em;
-  font-weight: 400;
-  color: var(--ink);
+  margin: clamp(2em, 6vh, 3.4em) 0 clamp(2.2em, 7vh, 3.6em);
+  max-width: 30ch;
+  /*
+   * A standfirst, not a hero headline. The house voice is restrained micro-type,
+   * so a 46px system sans at full white was the one thing on screen shouting.
+   * Smaller, lighter, open leading and a hair of positive tracking reads as the
+   * opening line of a catalogue entry instead.
+   */
+  font-size: clamp(20px, 2vw, 29px);
+  line-height: 1.45;
+  letter-spacing: 0.006em;
+  font-weight: 300;
+  color: rgba(242, 240, 236, 0.9);
   text-transform: none;
 }
 

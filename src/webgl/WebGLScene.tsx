@@ -38,16 +38,19 @@ function RenderPump() {
  */
 function DprGovernor() {
   const gl = useThree((s) => s.gl)
+  // A dependency, not a value: r3f re-applies its own `dpr` prop every time the
+  // canvas resizes, so without re-running here a rotate would silently undo the
+  // step down.
+  const size = useThree((s) => s.size)
   useEffect(() => {
     const apply = (level: 0 | 1) => {
-      if (level === 0) return
-      if (gl.getPixelRatio() <= 1) return
+      if (level === 0 || gl.getPixelRatio() <= 1) return
       gl.setPixelRatio(1)
       invalidate()
     }
     apply(perfStore.get())
     return perfStore.subscribe(apply)
-  }, [gl])
+  }, [gl, size])
   return null
 }
 

@@ -140,8 +140,9 @@ export function useSceneDriver(
         trackHeight = Math.round(vh * runtime.timeline.trackMultiplier)
         const track = refs.track.current
         if (track) track.style.height = `${trackHeight}px`
-        // A phone held upright is the one case where the 16:9 frame cannot fill
-        // the screen from the wide box, so it gets its own pair.
+        // Keyed on the shape of the viewport, not on the device: a tall narrow
+        // window is the one case where the 16:9 frame cannot fill the screen
+        // from the wide box, so it gets its own pair.
         const portrait = vh > vw * 1.2 && vw <= 560
         safeWide = portrait ? SAFE_WIDE_PORTRAIT : SAFE_WIDE
         safeTight = portrait ? SAFE_TIGHT_PORTRAIT : SAFE_TIGHT

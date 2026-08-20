@@ -318,7 +318,12 @@ pass well behind the fingers once they open.
 | DPR cap | 1.6 | 1.0–1.25 |
 | Draw calls | ~89 (44 without the transmission pass) | ~44 |
 | Triangles | ~110 k | ~50 k |
-| Measured | 60 fps, worst frame 17 ms | 60 fps, worst frame 17 ms |
+| Measured | 60 fps, worst frame 17 ms | 60 fps, worst frame 17 ms † |
+
+† At a 375 x 812 viewport on desktop hardware, through a continuous pass and
+through five momentum flicks. That measures the work the page asks for, not a
+phone's thermal budget — the structural costs are gone, but the numbers from
+real hardware will be its own.
 
 - The canvas runs `frameloop="demand"` and is pumped only while the specimen
   exists. During the film there is no WebGL work at all, and none at all behind
@@ -345,7 +350,7 @@ quality menu.
 
 | | High | Medium | Low |
 |---|---|---|---|
-| Video | 1080p | 1080p (720p on touch) | 540p |
+| Video | 1080p | 1080p (720p on touch, 540p on a phone) | 540p |
 | DPR | 1.6 | 1.25 | 1.0 |
 | Particles | 520 | 260 (180 on a phone) | 110 |
 | Shell segments | 22 | 16 | 12 |
@@ -357,8 +362,16 @@ quality menu.
 cores and eight gigabytes and scores as a workstation, which is how it ends up
 compiling a transmission shader and rendering the scene into a second target on
 every frame. Nothing in the platform reports GPU class, so the pointer type is
-the honest signal; a phone (coarse pointer, short edge ≤ 560 px) starts a step
-lower again and takes the 540p films, the 1280 px stills and a 1.25 DPR cap.
+the honest signal.
+
+A phone (coarse pointer, short edge ≤ 560 px) is then judged on what it reports
+rather than on what it fails to report, and takes medium unless something says
+otherwise. iOS implements no `deviceMemory` at all and its core count is
+conservative, so the generic score put every iPhone in the bottom tier — next to
+genuinely weak hardware, and below an Android that simply self-reports more
+freely. Only an explicit signal of weakness (three cores or fewer, or a reported
+`deviceMemory` under 4) sends a phone down. Either way it takes the 540p films,
+the 1280 px stills and a 1.25 DPR cap.
 
 ### Scroll on a phone
 

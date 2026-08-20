@@ -4,12 +4,6 @@ export type VideoTier = '1080' | '720' | '540'
 
 export interface QualityProfile {
   tier: QualityTier
-  /**
-   * A coarse pointer on a small viewport — a phone, not merely a touch screen.
-   * This is a *budget*, not a layout flag: everything a phone cannot afford
-   * hangs off it, because no feature test reports GPU class.
-   */
-  phone: boolean
   /** Upper bound for the WebGL drawing buffer ratio. */
   maxDpr: number
   video: VideoTier
@@ -64,11 +58,19 @@ export function detectQuality(): QualityProfile {
    * A flagship phone reports eight cores and eight gigabytes and scores as a
    * workstation, which is how it ends up compiling a transmission shader and
    * rendering the scene into a second target on every frame. Nothing in the
-   * platform reports GPU class, so the pointer type is the honest signal: a
-   * touch device never takes the top tier, and a phone starts one lower again.
+   * platform reports GPU class, so the pointer type is the honest signal, and a
+   * touch device never takes the top tier.
    */
   if (coarse && tier === 'high') tier = 'medium'
-  if (phone && tier === 'medium' && (cores < 6 || memory < 4)) tier = 'low'
+  /*
+   * A phone is then judged on what it reports rather than on what it fails to
+   * report. iOS implements no `deviceMemory` at all and its core count is
+   * conservative, so the generic score put every iPhone in the bottom tier —
+   * next to genuinely weak hardware, and below an Android that simply
+   * self-reports more freely. On a phone the score's inputs are too unreliable
+   * to rank with, so only an explicit signal of weakness sends one down.
+   */
+  if (phone) tier = cores <= 3 || memory < 4 ? 'low' : 'medium'
 
   const maxDpr = phone
     ? tier === 'low'
@@ -92,7 +94,6 @@ export function detectQuality(): QualityProfile {
 
   return {
     tier,
-    phone,
     maxDpr,
     video,
     compactStills: video === '540',

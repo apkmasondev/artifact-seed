@@ -245,7 +245,14 @@ export function ArtifactSeed({ materials, quality }: Props) {
     // ---- solid shell reveal ----------------------------------------------
     const shellScale = lerp(1, 0.86, open)
     const shellY = Math.sin(clock.current * 0.55) * 0.006 - rise * 0.05
-    materials.reveal.value = solid
+    /*
+     * Not zero while warming. The dissolve keeps a fragment when
+     * `d <= uReveal * 1.15 - 0.02 + n`, and its noise term `n` runs up to 0.25 —
+     * so at zero the fragments nearest the origin survive, and the warm-up
+     * frames painted a speckled core across her before the piece had started.
+     * Anything below -0.2 puts the threshold under every possible `d`.
+     */
+    materials.reveal.value = warming ? -1 : solid
     if (solidGroup.current) {
       solidGroup.current.visible = warming || solid > 0.002
       // The body compacts as it unfolds, so the bloom stays inside the hands.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MEDIA } from '../core/assets'
+import { overlayStore } from '../core/runtime'
 
 const AUTHOR_URL = 'https://apkmason.dev'
 
@@ -35,6 +36,12 @@ export function About() {
     setOpen(false)
     trigger.current?.focus()
   }, [])
+
+  // The scene has nothing to draw while the sheet is over it.
+  useEffect(() => {
+    overlayStore.set(open)
+    return () => overlayStore.set(false)
+  }, [open])
 
   useEffect(() => {
     if (!open) return

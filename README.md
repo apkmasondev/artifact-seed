@@ -77,16 +77,22 @@ timeline without fighting the scroll position.
 public/
 ├── media/
 │   ├── film-01-1080.mp4      1920×1080  ·  3.8 MB   desktop master
-│   ├── film-01-720.mp4       1280×720   ·  1.3 MB   mobile / save-data
+│   ├── film-01-720.mp4       1280×720   ·  1.3 MB   tablet / save-data
+│   ├── film-01-540.mp4        960×540   ·  1.6 MB   phone — all-intra
 │   ├── film-02-1080.mp4      1920×1080  ·  6.5 MB
 │   ├── film-02-720.mp4       1280×720   ·  1.7 MB
+│   ├── film-02-540.mp4        960×540   ·  1.9 MB
 │   ├── film-01-poster.webp
 │   ├── film-02-poster.webp
 │   ├── final-pose.webp                             frozen last frame of film 02
-│   └── final-pose-lit.webp                         the same frame, lit by the core
+│   ├── final-pose-720.webp                         phone variant, 1280×720
+│   ├── final-pose-lit.webp                         the same frame, lit by the core
+│   └── final-pose-lit-720.webp
 ├── artifact/
 │   ├── hand-foreground.webp                        the hands, alpha-cut
+│   ├── hand-foreground-720.webp                    phone variant, 1280×720
 │   ├── hand-foreground-lit.webp                    the same cut, lit by the core
+│   ├── hand-foreground-lit-720.webp
 │   └── artifact-seed-reference.webp                WebGL-unavailable fallback
 ├── audio/
 │   └── ambience.m4a         4:06       ·  4.2 MB   fetched only if asked for
@@ -133,8 +139,35 @@ The choices that matter for scrubbing:
 - **audio stripped** — the experience never plays sound, and the architecture
   keeps an audio layer addable later without restructuring.
 
-The 720p variants are chosen at runtime from device memory, core count, pointer
-type and `navigator.connection`. Only one resolution is ever fetched.
+#### The phone encode is a different kind of file
+
+The 540p pair is not simply a smaller picture — it is **all-intra**: every one of
+its 240 frames is a keyframe, so a scrub seek is one frame of decode and nothing
+else, instead of a walk down a GOP.
+
+That inverts the usual trade. It is *larger* than the 720p encode (1.6 / 1.9 MB
+against 1.3 / 1.7) and several times cheaper to scrub, which is the direction a
+phone actually needs: bandwidth is a one-off, decoder time is paid on every
+frame of the gesture, and the decoder shares its thermal budget with the
+compositor drawing the page.
+
+```bash
+ffmpeg -i film-02-1080.mp4 -an -vf "scale=960:540:flags=lanczos"   -c:v libx264 -profile:v main -level 3.1 -pix_fmt yuv420p   -preset veryslow -crf 23   -g 1 -keyint_min 1 -sc_threshold 0   -x264-params ref=1:bframes=0:aq-mode=2   -movflags +faststart   film-02-540.mp4
+```
+
+Re-encoded from the shipped 1080p rather than the camera original, deliberately:
+the grade, the denoise and film 02's one-code-value lift are already baked in
+there, so the phone cut is guaranteed to match the desktop cut frame for frame.
+At 48 dB PSNR against the downscaled master the second generation costs nothing
+visible.
+
+The stills ship twice for the same reason — `scripts/make_mobile_assets.py`
+derives a 1280 px set, a quarter of the image memory, of which six layers are
+composited on every scrolled frame.
+
+Which set is fetched is decided at runtime from device memory, core count,
+pointer type, viewport size and `navigator.connection`. Only one is ever
+fetched.
 
 ---
 
@@ -158,10 +191,21 @@ Damping is frame-rate independent (`1 - exp(-λ·dt)`), so a 144 Hz display and 
 
 ### 2. Seeking, not playing
 
-`currentTime` is never written unconditionally. Writes are coalesced: while a
-seek is in flight nothing is written, and the newest target is applied on
-`seeked`. Without this, a fast scroll queues dozens of seeks and the decoder
-stutters for seconds.
+`currentTime` is never written unconditionally. Three things stand between the
+scroll wheel and the decoder:
+
+- **Coalescing.** While a seek is in flight nothing is written; the newest target
+  is applied on `seeked`. Without this a fast scroll queues dozens of seeks and
+  the decoder stutters for seconds.
+- **Frame quantisation.** Scroll arrives at 60–120 Hz against a 24 fps source, so
+  most targets land inside the frame already on screen. Snapping the target to
+  the source's own frame grid drops those seeks entirely rather than decoding an
+  identical picture again.
+- **Pacing.** Flushing the instant `seeked` fires runs the media thread at 100 %
+  occupancy — and the compositor is behind it in the same queue, which is felt as
+  page-scroll jank rather than as a stuttering film. Each seek is timed and the
+  next waits a fraction of that (capped at 90 ms), so a slow decoder throttles
+  itself and a fast one is never held back.
 
 ### 3. A cut, not a dissolve
 
@@ -213,6 +257,14 @@ x 428–1428) to tight (the final pose only needs x 690–1230) as the gesture
 resolves. On a 16:9 desktop both resolve to the same full-bleed transform, so
 nothing moves; in portrait it reads as a slow push-in.
 
+A portrait phone gets its own pair. Held to the 800 px wide box, a 16:9 frame
+fills 62 % of the screen and letterboxes the rest — which reads as a video
+embedded in a page rather than a piece you are inside of. 720 takes 40 px off
+each side of a reach the wide box has always clipped and buys seven points of
+screen; 520 all but fills the phone at the final pose, where nothing outside the
+shoulders is load-bearing. Everything else is in video space, so the specimen
+scales with the frame and stays exactly between the palms.
+
 ### 7. The specimen lights her back
 
 Everything above is the WebGL layer reacting to the film. These two channels run
@@ -261,38 +313,87 @@ pass well behind the fingers once they open.
 
 ## Performance
 
-| | Desktop | Mobile |
+| | Desktop | Phone |
 |---|---|---|
-| DPR cap | 1.6 | 1.25–1.5 |
+| DPR cap | 1.6 | 1.0–1.25 |
 | Draw calls | ~89 (44 without the transmission pass) | ~44 |
 | Triangles | ~110 k | ~50 k |
-| Measured | 60 fps, worst frame 17 ms | — |
+| Measured | 60 fps, worst frame 17 ms | 60 fps, worst frame 17 ms |
 
 - The canvas runs `frameloop="demand"` and is pumped only while the specimen
-  exists. During the film there is no WebGL work at all.
+  exists. During the film there is no WebGL work at all, and none at all behind
+  the about sheet.
 - One petal geometry is shared by all eight panels; materials are memoised and
   disposed on unmount; nothing is allocated in `useFrame`.
 - Real refraction (`transmission`) is high tier only, and `transmission` is never
   toggled at runtime — that recompiles the shader mid-scroll.
 - The solid shell materialises through a dissolve injected into the existing PBR
   shaders, so the eight panels stay opaque and never need transparency sorting.
+- The first frames after the canvas mounts draw the whole object with the
+  dissolve closed. Nothing reaches the screen; everything reaches the shader
+  compiler. Without it three.js compiles each material the first time it is
+  actually drawn — which is halfway through the materialise, and was a 630 ms
+  stall in the one beat the piece cannot afford one.
 - `webglcontextlost` is handled; the reference render stands in until the context
   comes back.
 
 ### Quality tiers
 
-Chosen from `hardwareConcurrency`, `deviceMemory`, pointer type, viewport area ×
-DPR and `navigator.connection`. There is no quality menu.
+Chosen from `hardwareConcurrency`, `deviceMemory`, pointer type, the short edge
+of the viewport, viewport area × DPR and `navigator.connection`. There is no
+quality menu.
 
 | | High | Medium | Low |
 |---|---|---|---|
-| Video | 1080p | 1080p | 720p |
+| Video | 1080p | 1080p (720p on touch) | 540p |
 | DPR | 1.6 | 1.25 | 1.0 |
-| Particles | 520 | 260 | 110 |
+| Particles | 520 | 260 (180 on a phone) | 110 |
 | Shell segments | 22 | 16 | 12 |
 | Transmission | yes | no | no |
 | MSAA | yes | yes | no |
-| Grain | yes | yes | no |
+| Grain | yes | desktop only | no |
+
+**A coarse pointer never takes the top tier.** A flagship phone reports eight
+cores and eight gigabytes and scores as a workstation, which is how it ends up
+compiling a transmission shader and rendering the scene into a second target on
+every frame. Nothing in the platform reports GPU class, so the pointer type is
+the honest signal; a phone (coarse pointer, short edge ≤ 560 px) starts a step
+lower again and takes the 540p films, the 1280 px stills and a 1.25 DPR cap.
+
+### Scroll on a phone
+
+Two things were costing more than the whole 3D scene.
+
+**The viewport was resizing under the gesture.** A mobile browser slides its
+toolbar away *during* the scroll, and `100dvh` follows it pixel by pixel. Every
+one of those pixels relaid out the stage — and resized the WebGL drawing buffer,
+a framebuffer reallocation, on most of the frames of the most performance-
+critical gesture in the piece. The driver now commits a pixel height on its first
+measure and re-commits only on a real resize (a width change, or more than 20 %
+of height). The band the retracting toolbar uncovers is left to the black page
+behind it, where it cannot be seen.
+
+**A full-screen `mix-blend-mode` layer.** The grain forces the whole stage to be
+re-composited every time it steps, and on a phone it costs more than the WebGL
+pass it sits over. It is now desktop-only; the film carries its own.
+
+Alongside those, on a coarse pointer: the about sheet drops its backdrop filter
+for a heavier plate (a blur over a video, a canvas and six stacked full-frame
+layers is re-evaluated for every pixel of the sheet on every scrolled frame of
+it), the hairline captions keep their size but gain 44 px hit areas out of
+transparent padding, and cursor parallax is switched off — a finger has no
+resting position, so the object would tip to wherever the last gesture ended and
+stay there. Drag still turns it.
+
+### What the device says, versus what it does
+
+Detection is a guess, so the RAF loop also measures. Two consecutive seconds
+under 45 fps while the scene is running is not a hitch — it is the wrong
+profile — and the driver steps down once: the drawing buffer drops to 1:1, the
+grain layer leaves the DOM, and both scrubbers widen their seek floor. One way
+only. A scene that flips quality back and forth under load is worse than one
+that stays where it landed, and the step itself costs a framebuffer
+reallocation.
 
 ### Reduced motion
 
@@ -377,9 +478,9 @@ src/
 ├── core/
 │   ├── scene.ts            video-space constants + the scroll timeline
 │   ├── videoFit.ts         "cover, but never crop the safe box"
-│   ├── videoScrubber.ts    coalesced seeking
+│   ├── videoScrubber.ts    coalesced, quantised, self-pacing seeking
 │   ├── runtime.ts          the single mutable frame state
-│   ├── quality.ts          tier detection
+│   ├── quality.ts          tier detection + the phone budget
 │   ├── assets.ts
 │   └── math.ts
 ├── hooks/
@@ -397,7 +498,8 @@ src/
 └── styles/global.css
 
 scripts/
-└── make_lit_pose.py        renders the core-lit variants of the frozen frame
+├── make_lit_pose.py        renders the core-lit variants of the frozen frame
+└── make_mobile_assets.py   derives the 1280 px still set for the phone tier
 ```
 
 ---
@@ -414,7 +516,14 @@ scripts/
   cropping the dancer's feet, and the letterbox is black on black.
 - Scrubbing an H.264 file is decoder-bound. A very fast flick can outrun the
   decoder by a few hundred milliseconds before it catches up; this is inherent to
-  scroll-driven video and is why the GOP is short.
+  scroll-driven video, and is why the GOP is short on desktop and gone entirely
+  on the phone encode.
+- The phone films are 960 px wide against a safe box the phone shows across
+  roughly 390 CSS px, so on a 3× screen they are upscaled. That is the price of
+  an all-intra encode small enough to ship, and it is paid on a dark, denoised,
+  deliberately low-contrast image where it is hardest to see. The stills that
+  replace the film at the freeze are 1280 px, a lift small enough to cross the
+  four-frame dissolve unnoticed.
 - The hand mask is cut from one frozen frame, so occlusion is only active from
   the freeze onwards — which is exactly when the specimen appears.
 - The lit variant is baked for the core's resting position. Once the core rises

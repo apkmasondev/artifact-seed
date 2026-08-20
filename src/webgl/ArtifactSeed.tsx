@@ -198,6 +198,16 @@ export function ArtifactSeed({ materials, quality }: Props) {
   const glowInner = useRef<Sprite>(null)
   const glowOuter = useRef<Sprite>(null)
   const clock = useRef(0)
+  /**
+   * Three.js compiles a material the first time it is actually drawn, and every
+   * part of the seed is gated on the beat that reveals it — so the whole shader
+   * set, envmap bindings included, was being compiled halfway through the
+   * materialise. On a phone that is a visible stall in the one moment the piece
+   * cannot afford one. These first frames draw the entire object with the
+   * dissolve closed: nothing reaches the screen, everything reaches the
+   * compiler, and it happens while the film is still playing.
+   */
+  const warmup = useRef(4)
 
   useEffect(
     () => () => {
@@ -211,6 +221,8 @@ export function ArtifactSeed({ materials, quality }: Props) {
     const dt = Math.min(0.05, delta)
     const { open, wire, dust, spark, solid, rise } = runtime
     clock.current += dt
+    const warming = warmup.current > 0
+    if (warming) warmup.current -= 1
 
     // ---- shell panels -----------------------------------------------------
     for (let i = 0; i < PANEL_COUNT; i++) {
@@ -235,7 +247,7 @@ export function ArtifactSeed({ materials, quality }: Props) {
     const shellY = Math.sin(clock.current * 0.55) * 0.006 - rise * 0.05
     materials.reveal.value = solid
     if (solidGroup.current) {
-      solidGroup.current.visible = solid > 0.002
+      solidGroup.current.visible = warming || solid > 0.002
       // The body compacts as it unfolds, so the bloom stays inside the hands.
       solidGroup.current.scale.setScalar(shellScale)
       // The husk settles as the core leaves it.
@@ -246,7 +258,7 @@ export function ArtifactSeed({ materials, quality }: Props) {
     const cageOpacity = Math.min(wire, 1 - smoothstep(solid, 0.15, 0.85))
     materials.wire.uniforms.uProgress.value = wire
     materials.wire.uniforms.uOpacity.value = cageOpacity * 0.85
-    if (cageRef.current) cageRef.current.visible = cageOpacity > 0.005
+    if (cageRef.current) cageRef.current.visible = warming || cageOpacity > 0.005
 
     // ---- particles --------------------------------------------------------
     const dustOpacity = Math.min(dust, 0.25 + 0.75 * (1 - smoothstep(solid, 0.3, 1)))
@@ -255,7 +267,7 @@ export function ArtifactSeed({ materials, quality }: Props) {
     materials.particle.uniforms.uOpacity.value = dustOpacity * 0.75
     materials.particle.uniforms.uSpread.value = 1 + open * 0.1
     if (pointsRef.current) {
-      pointsRef.current.visible = dustOpacity > 0.005
+      pointsRef.current.visible = warming || dustOpacity > 0.005
       // gl_PointSize is in framebuffer pixels, so it has to be derived from the
       // projection every frame — the rig rescales with the film rect.
       const worldScale = pointsRef.current.getWorldScale(tmpScale).x
@@ -290,13 +302,13 @@ export function ArtifactSeed({ materials, quality }: Props) {
       // releases — not as a growth effect.
       sphereRef.current.scale.setScalar((0.34 + open * 0.66) * (1 + rise * 0.14))
       sphereRef.current.rotation.y = clock.current * 0.12
-      sphereRef.current.visible = open > 0.02
+      sphereRef.current.visible = warming || open > 0.02
     }
     if (glassRef.current) {
       // Never touch `transmission` at runtime — flipping it recompiles the shader.
       const fade = 1 - smoothstep(open, 0.3, 0.85)
       materials.glass.opacity = (quality.transmission ? 1 : 0.55) * fade
-      glassRef.current.visible = fade > 0.02 && solid > 0.02
+      glassRef.current.visible = warming || (fade > 0.02 && solid > 0.02)
     }
 
     // ---- additive glow ----------------------------------------------------

@@ -52,6 +52,12 @@ export function SeedMotion({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const s = state.current
+    /*
+     * Parallax is a cursor idea. A finger has no resting position — it arrives,
+     * moves once and leaves — so on touch the object would tip to wherever the
+     * last scroll gesture ended and simply stay there. Drag still turns it.
+     */
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 
     const isInteractiveTarget = (target: EventTarget | null) =>
       target instanceof Element && target.closest('button, a, [role="button"]') !== null
@@ -68,10 +74,10 @@ export function SeedMotion({ children }: { children: ReactNode }) {
     }
 
     const onMove = (event: PointerEvent) => {
-      const nx = (event.clientX / innerWidth) * 2 - 1
-      const ny = (event.clientY / innerHeight) * 2 - 1
-      s.targetParallaxX = nx
-      s.targetParallaxY = ny
+      if (!coarse) {
+        s.targetParallaxX = (event.clientX / innerWidth) * 2 - 1
+        s.targetParallaxY = (event.clientY / innerHeight) * 2 - 1
+      }
 
       if (!s.dragging || event.pointerId !== s.pointerId) return
       const dx = event.clientX - s.lastX

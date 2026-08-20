@@ -26,6 +26,20 @@ export const SAFE_WIDE: SafeBox = { x: 560, y: 0, w: 800, h: VIDEO_H }
 /** Final pose — only the hands, the shoulders and the seed survive the crop. */
 export const SAFE_TIGHT: SafeBox = { x: 690, y: 0, w: 540, h: VIDEO_H }
 
+/*
+ * Portrait phones get their own pair.
+ *
+ * A 16:9 frame held to the 800 px wide box fills 62 % of a phone screen and
+ * letterboxes the rest — which reads as a video embedded in a page, not as a
+ * piece you are inside of. Narrowing the box raises the scale, and the height
+ * follows. 720 takes 40 px off each side of an already-cropped reach (the arms
+ * run 428..1428 and the wide box has always clipped their extremes) and buys
+ * seven points of screen; 520 all but fills the phone at the final pose, where
+ * nothing outside the shoulders is load-bearing anyway.
+ */
+export const SAFE_WIDE_PORTRAIT: SafeBox = { x: 600, y: 0, w: 720, h: VIDEO_H }
+export const SAFE_TIGHT_PORTRAIT: SafeBox = { x: 700, y: 0, w: 520, h: VIDEO_H }
+
 /** Centre of the empty space the dancer builds between her palms. */
 export const SEED_ANCHOR = { x: 963, y: 562 }
 /**

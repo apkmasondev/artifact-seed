@@ -102,3 +102,16 @@ export const audioAvailableStore = createStore(false)
 export const readyStore = createStore(false)
 export const loadStore = createStore(0)
 export const contextLostStore = createStore(false)
+/**
+ * 0 = run at the profile the device was detected as, 1 = the frame governor has
+ * seen sustained slow frames and stepped it down. One-way: a scene that flips
+ * quality back and forth under load is worse than one that stays where it
+ * landed, and the step itself costs a framebuffer reallocation.
+ */
+export const perfStore = createStore<0 | 1>(0)
+/**
+ * The about sheet covers the scene completely. While it is up there is nothing
+ * to render behind it, and on a phone that idle pump is a real share of the
+ * budget the blurred panel itself is asking for.
+ */
+export const overlayStore = createStore(false)

@@ -1,12 +1,15 @@
 import { RefObject, useEffect } from 'react'
 import { clamp, damp, range, smoothstep, smootherstep } from '../core/math'
-import { ambience, runtime, stageStore, StageName } from '../core/runtime'
+import { QualityProfile } from '../core/quality'
+import { ambience, perfStore, runtime, stageStore, StageName } from '../core/runtime'
 import {
   FILM2_START,
   FILM_DURATION,
   FILM_FPS,
   SAFE_TIGHT,
+  SAFE_TIGHT_PORTRAIT,
   SAFE_WIDE,
+  SAFE_WIDE_PORTRAIT,
   TIMELINE,
   TIMELINE_REDUCED,
 } from '../core/scene'
@@ -29,6 +32,17 @@ export interface SceneRefs {
 const SEEK_EPSILON = 1 / (FILM_FPS * 2.4)
 /** Damping strength, 1/s. High enough to catch a flick, low enough to glide. */
 const DAMPING = 9
+
+/*
+ * Frame governor. Detection reads what a device *says* about itself; this reads
+ * what it actually delivers. Two consecutive seconds under 45 fps, while the
+ * scene is genuinely running, is not a hitch — it is the wrong profile.
+ */
+const GOVERNOR_WINDOW_MS = 1000
+const GOVERNOR_FLOOR_FPS = 45
+const GOVERNOR_STRIKES = 2
+/** How far apart seeks are pushed once the governor has stepped in. */
+const DEGRADED_SEEK_FLOOR_MS = 1000 / 15
 
 /**
  * Dev-only: `?p=0.82` pins the timeline so a single moment can be inspected
@@ -60,7 +74,11 @@ function setStyle(
  * film, the mask, the WebGL rig and the UI are always describing the same
  * instant.
  */
-export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
+export function useSceneDriver(
+  refs: SceneRefs,
+  reducedMotion: boolean,
+  quality: QualityProfile,
+) {
   useEffect(() => {
     const stage = refs.stage.current
     if (!stage) return
@@ -76,6 +94,11 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
     let trackHeight = 0
     let lastViewportW = 0
     let lastViewportH = 0
+    let safeWide = SAFE_WIDE
+    let safeTight = SAFE_TIGHT
+    let governorStart = 0
+    let governorFrames = 0
+    let governorStrikes = 0
     const pinned = debugProgress()
     // Latched, never re-tested: `readyState` drops back below HAVE_CURRENT_DATA
     // while a seek is in flight, and re-testing it would punch film 01's last
@@ -94,27 +117,67 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
       meter: {},
     }
 
+    /**
+     * Locks the stage to a height, rather than letting CSS follow the viewport.
+     *
+     * A mobile browser slides its toolbar away *during* the scroll, and `100dvh`
+     * follows it pixel by pixel. Every one of those pixels relaid out the stage,
+     * which resized the WebGL drawing buffer — a framebuffer reallocation, on
+     * most of the frames of the most performance-critical gesture in the piece.
+     * So the height is committed only on a real resize, and the band the
+     * retracting toolbar uncovers is left to the black page behind it, where it
+     * is invisible.
+     */
     const measure = (force = false) => {
-      // Measure the stage, not the window: the WebGL canvas is sized from the
-      // same box, so the film rect and the 3D projection cannot disagree.
       const vw = stage.clientWidth || innerWidth
-      const vh = stage.clientHeight || innerHeight
-      // Mobile browsers resize the viewport when the toolbar slides away. Only a
-      // real resize should relayout the scroll track, otherwise progress jumps.
+      const vh = innerHeight
       const widthChanged = vw !== lastViewportW
       const heightChanged = Math.abs(vh - lastViewportH) > lastViewportH * 0.2
       if (force || widthChanged || heightChanged) {
         lastViewportW = vw
         lastViewportH = vh
-        // innerHeight, not the stage: the track has to keep a stable length
-        // while the toolbar animates, or progress jumps under the reader.
-        trackHeight = Math.round(innerHeight * runtime.timeline.trackMultiplier)
+        stage.style.height = `${vh}px`
+        trackHeight = Math.round(vh * runtime.timeline.trackMultiplier)
         const track = refs.track.current
         if (track) track.style.height = `${trackHeight}px`
+        // A phone held upright is the one case where the 16:9 frame cannot fill
+        // the screen from the wide box, so it gets its own pair.
+        const portrait = vh > vw * 1.2 && vw <= 560
+        safeWide = portrait ? SAFE_WIDE_PORTRAIT : SAFE_WIDE
+        safeTight = portrait ? SAFE_TIGHT_PORTRAIT : SAFE_TIGHT
       }
-      runtime.viewport.w = vw
-      runtime.viewport.h = vh
-      scrollMax = Math.max(1, trackHeight - vh)
+      runtime.viewport.w = lastViewportW
+      runtime.viewport.h = lastViewportH
+      scrollMax = Math.max(1, trackHeight - lastViewportH)
+    }
+
+    const resetGovernor = () => {
+      governorStart = 0
+      governorFrames = 0
+    }
+
+    /**
+     * What the device said it was, versus what it turned out to be. One step
+     * down, once: the canvas drops to a 1:1 drawing buffer, the grain layer
+     * leaves the DOM and the two scrubbers stop competing with the compositor.
+     */
+    const governFrame = (now: number) => {
+      if (perfStore.get() !== 0 || runtime.p < 0.02) return
+      if (governorStart === 0) {
+        governorStart = now
+        governorFrames = 0
+        return
+      }
+      governorFrames += 1
+      const elapsed = now - governorStart
+      if (elapsed < GOVERNOR_WINDOW_MS) return
+      const fps = (governorFrames * 1000) / elapsed
+      governorStrikes = fps < GOVERNOR_FLOOR_FPS ? governorStrikes + 1 : 0
+      resetGovernor()
+      if (governorStrikes < GOVERNOR_STRIKES) return
+      perfStore.set(1)
+      filmScrubber?.setFloor(DEGRADED_SEEK_FLOOR_MS)
+      poseScrubber?.setFloor(DEGRADED_SEEK_FLOOR_MS)
     }
 
     const applyFrame = (now: number) => {
@@ -122,6 +185,7 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
 
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
+      governFrame(now)
 
       const raw = pinned ?? clamp(scrollY / scrollMax)
       runtime.p = runtime.reducedMotion ? raw : damp(runtime.p, raw, DAMPING, dt)
@@ -133,7 +197,7 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
 
       // ---- frame transform (shared by film, still and hand mask) -----------
       const pushT = smoothstep(p, T.push[0], T.push[1])
-      const safe = lerpSafeBox(SAFE_WIDE, SAFE_TIGHT, pushT)
+      const safe = lerpSafeBox(safeWide, safeTight, pushT)
       const rect = computeVideoRect(runtime.viewport.w, runtime.viewport.h, safe)
       runtime.rect = rect
       setStyle(stage, '--fx', `${rect.x.toFixed(2)}px`, styleCache.stage)
@@ -238,12 +302,24 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
     measure(true)
 
     const onResize = () => measure()
+    // A backgrounded tab stops producing frames, and the first one back would
+    // otherwise be read as a second of catastrophic frame rate.
+    const onVisibility = () => resetGovernor()
     addEventListener('resize', onResize, { passive: true })
     addEventListener('orientationchange', onResize, { passive: true })
     visualViewport?.addEventListener('resize', onResize, { passive: true })
+    document.addEventListener('visibilitychange', onVisibility)
 
-    if (refs.film1.current) filmScrubber = new VideoScrubber(refs.film1.current, SEEK_EPSILON)
-    if (refs.film2.current) poseScrubber = new VideoScrubber(refs.film2.current, SEEK_EPSILON)
+    // Quantised to the source's own frame grid: scroll arrives far faster than
+    // 24 fps, and a seek that lands inside the frame already decoded is pure
+    // decoder load for an identical picture.
+    const scrubOptions = {
+      epsilon: SEEK_EPSILON,
+      frameStep: 1 / FILM_FPS,
+      floorMs: quality.seekFloorMs,
+    }
+    if (refs.film1.current) filmScrubber = new VideoScrubber(refs.film1.current, scrubOptions)
+    if (refs.film2.current) poseScrubber = new VideoScrubber(refs.film2.current, scrubOptions)
 
     raf = requestAnimationFrame(applyFrame)
 
@@ -252,8 +328,9 @@ export function useSceneDriver(refs: SceneRefs, reducedMotion: boolean) {
       removeEventListener('resize', onResize)
       removeEventListener('orientationchange', onResize)
       visualViewport?.removeEventListener('resize', onResize)
+      document.removeEventListener('visibilitychange', onVisibility)
       filmScrubber?.dispose()
       poseScrubber?.dispose()
     }
-  }, [refs, reducedMotion])
+  }, [refs, reducedMotion, quality])
 }

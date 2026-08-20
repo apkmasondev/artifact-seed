@@ -74,13 +74,19 @@ body {
   pointer-events: none;
 }
 
+/*
+ * The height here is a first-paint value only — the scene driver commits a
+ * pixel height on its first measure and re-commits it on real resizes. `svh`,
+ * not `dvh`: the dynamic unit tracks the mobile toolbar frame by frame, and
+ * every one of those frames resized the WebGL drawing buffer underneath it.
+ */
 .stage {
   position: fixed;
   left: 0;
   top: 0;
   width: 100%;
   height: 100vh;
-  height: 100dvh;
+  height: 100svh;
   overflow: hidden;
   background: #000;
 }
@@ -803,6 +809,60 @@ body {
   .ui__restart::before,
   .ui__sound::after {
     width: 14px;
+  }
+}
+
+/* ---------------------------------------------------------------- touch -- */
+
+/*
+ * Everything a finger changes, and everything a phone cannot afford. Keyed on
+ * the pointer rather than on width, because the two things being corrected here
+ * — hit areas and compositing cost — both follow the input device and the GPU,
+ * not the number of CSS pixels.
+ */
+@media (pointer: coarse) {
+  /*
+   * The hairline captions are the right size for the piece and the wrong size
+   * for a thumb. The padding is transparent, and each control is pulled back by
+   * half of what it gained, so nothing on screen moves — only the hit area
+   * grows, to about 44 px.
+   */
+  .ui__restart,
+  .ui__sound {
+    padding: 1.8em 0.7em;
+    bottom: calc(var(--ui-inset-bottom) - 1.2em);
+  }
+
+  .ui__restart {
+    right: calc(var(--ui-inset-right) - 0.7em);
+  }
+
+  .ui__sound {
+    left: calc(var(--ui-inset-left) - 0.7em);
+  }
+
+  .ui__about {
+    padding: 1.8em 0.7em;
+    margin: -1.4em -0.7em;
+  }
+
+  .about__close {
+    padding: 1.6em 0.7em;
+    margin: -0.6em -0.7em;
+  }
+
+  /*
+   * A backdrop filter over a video, a WebGL canvas and six stacked full-frame
+   * layers is re-evaluated for every pixel of this sheet on every scrolled
+   * frame of it. Raising the plate's own opacity instead costs a single
+   * composite — and the blur was doing more than dimming: without it the scene
+   * behind the text is legible rather than merely present, so the plate has to
+   * go further up than the desktop's 0.86 to keep the sheet quiet.
+   */
+  .about {
+    background: rgba(0, 0, 0, 0.972);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

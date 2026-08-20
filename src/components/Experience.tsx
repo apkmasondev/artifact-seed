@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MEDIA } from '../core/assets'
+import { MEDIA, variant } from '../core/assets'
 import { detectQuality, prefersReducedMotion } from '../core/quality'
-import { contextLostStore, readyStore } from '../core/runtime'
+import { contextLostStore, perfStore, readyStore } from '../core/runtime'
 import { useMediaUnlock, usePreload } from '../hooks/usePreload'
 import { useSceneDriver } from '../hooks/useSceneDriver'
 import { useStore } from '../hooks/useStore'
@@ -28,6 +28,7 @@ export function Experience() {
   const webgl = useMemo(hasWebGL, [])
   const ready = useStore(readyStore)
   const contextLost = useStore(contextLostStore)
+  const degraded = useStore(perfStore) === 1
   const [mountCanvas, setMountCanvas] = useState(false)
 
   const stage = useRef<HTMLDivElement>(null)
@@ -46,15 +47,26 @@ export function Experience() {
     [],
   )
   const mediaRefs = useMemo(() => ({ film1, film2 }), [])
+
+  const compact = quality.compactStills
+  const stills = useMemo(
+    () => ({
+      pose: variant(MEDIA.finalPose, compact),
+      poseLit: variant(MEDIA.finalPoseLit, compact),
+      hands: variant(MEDIA.hands, compact),
+      handsLit: variant(MEDIA.handsLit, compact),
+    }),
+    [compact],
+  )
   const preloadSources = useMemo(
-    () => [MEDIA.film1.poster, MEDIA.finalPose, MEDIA.finalPoseLit, MEDIA.hands, MEDIA.handsLit],
-    [],
+    () => [MEDIA.film1.poster, stills.pose, stills.poseLit, stills.hands, stills.handsLit],
+    [stills],
   )
 
-  const film1Src = quality.useMobileVideo ? MEDIA.film1.sd : MEDIA.film1.hd
-  const film2Src = quality.useMobileVideo ? MEDIA.film2.sd : MEDIA.film2.hd
+  const film1Src = MEDIA.film1[quality.video]
+  const film2Src = MEDIA.film2[quality.video]
 
-  useSceneDriver(refs, reduced)
+  useSceneDriver(refs, reduced, quality)
   usePreload(mediaRefs, preloadSources, !reduced)
   useMediaUnlock(mediaRefs)
 
@@ -106,11 +118,11 @@ export function Experience() {
               />
             </>
           )}
-          <img className="still" ref={still} src={MEDIA.finalPose} alt="" decoding="async" />
+          <img className="still" ref={still} src={stills.pose} alt="" decoding="async" />
           <img
             className="still still--lit"
             ref={stillLit}
-            src={MEDIA.finalPoseLit}
+            src={stills.poseLit}
             alt=""
             decoding="async"
           />
@@ -137,11 +149,11 @@ export function Experience() {
         )}
 
         <div className="frame frame--front" aria-hidden="true">
-          <img className="hands" ref={hands} src={MEDIA.hands} alt="" decoding="async" />
+          <img className="hands" ref={hands} src={stills.hands} alt="" decoding="async" />
           <img
             className="hands hands--lit"
             ref={handsLit}
-            src={MEDIA.handsLit}
+            src={stills.handsLit}
             alt=""
             decoding="async"
           />
@@ -149,7 +161,7 @@ export function Experience() {
         </div>
 
         <div className="vignette" aria-hidden="true" />
-        {quality.grain && <div className="grain" aria-hidden="true" />}
+        {quality.grain && !degraded && <div className="grain" aria-hidden="true" />}
 
         <Interface meter={meter} />
       </div>

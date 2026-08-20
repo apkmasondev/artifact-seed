@@ -2,7 +2,7 @@ import { Canvas, invalidate, useThree } from '@react-three/fiber'
 import { useEffect, useMemo } from 'react'
 import { ACESFilmicToneMapping } from 'three'
 import { QualityProfile } from '../core/quality'
-import { contextLostStore, runtime } from '../core/runtime'
+import { contextLostStore, overlayStore, perfStore, runtime } from '../core/runtime'
 import { ArtifactSeed } from './ArtifactSeed'
 import { Lighting } from './Lighting'
 import { createSeedMaterials } from './materials'
@@ -19,7 +19,7 @@ function RenderPump() {
     let tail = 6
     const tick = () => {
       raf = requestAnimationFrame(tick)
-      if (runtime.seedOpacity > 0.001) tail = 4
+      if (runtime.seedOpacity > 0.001 && !overlayStore.get()) tail = 4
       if (tail > 0) {
         tail -= 1
         invalidate()
@@ -28,6 +28,26 @@ function RenderPump() {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [])
+  return null
+}
+
+/**
+ * The one lever the frame governor can still pull after the context exists.
+ * Geometry, materials and MSAA are all fixed at creation; the drawing buffer is
+ * not, and on a phone it is where nearly all of the fill rate goes.
+ */
+function DprGovernor() {
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    const apply = (level: 0 | 1) => {
+      if (level === 0) return
+      if (gl.getPixelRatio() <= 1) return
+      gl.setPixelRatio(1)
+      invalidate()
+    }
+    apply(perfStore.get())
+    return perfStore.subscribe(apply)
+  }, [gl])
   return null
 }
 
@@ -91,6 +111,7 @@ export function WebGLScene({ quality }: { quality: QualityProfile }) {
     >
       <RenderPump />
       <ContextGuard />
+      <DprGovernor />
       <Scene quality={quality} />
     </Canvas>
   )

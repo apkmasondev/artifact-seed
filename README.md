@@ -390,6 +390,15 @@ behind it, where it cannot be seen.
 re-composited every time it steps, and on a phone it costs more than the WebGL
 pass it sits over. It is now desktop-only; the film carries its own.
 
+**Hover is gated on having a pointer.** A touch browser applies `:hover` on tap
+and then leaves it applied until something else is touched, so every control the
+viewer had used stayed lit behind them — a highlight with nothing hovering over
+it. Every hover state in the piece now lives in one `@media (hover: hover)`
+block. Focus is deliberately outside it: `:focus-visible` is never raised by a
+tap, so gating it would cost keyboard users their only cue and save touch
+nothing. The tap highlight goes too — every control here already answers for
+itself, and on a black field a grey flash box is borrowed chrome.
+
 Alongside those, on a coarse pointer: the about sheet drops its backdrop filter
 for a heavier plate (a blur over a video, a canvas and six stacked full-frame
 layers is re-evaluated for every pixel of the sheet on every scrolled frame of

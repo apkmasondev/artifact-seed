@@ -385,16 +385,9 @@ body {
   color: var(--ink-dim);
 }
 
-.ui__restart:hover,
 .ui__restart:focus-visible,
-.ui__sound:hover,
 .ui__sound:focus-visible {
   color: var(--ink);
-}
-
-.ui__restart:hover::before,
-.ui__sound:hover::after {
-  width: clamp(26px, 4.4vw, 56px);
 }
 
 .ui__restart:focus-visible,
@@ -424,7 +417,6 @@ body {
   transition: color 300ms ease;
 }
 
-.ui__about:hover,
 .ui__about:focus-visible {
   color: var(--ink);
 }
@@ -518,13 +510,8 @@ body {
   transition: width 300ms ease;
 }
 
-.about__close:hover,
 .about__close:focus-visible {
   color: var(--ink);
-}
-
-.about__close:hover::after {
-  width: clamp(26px, 4.4vw, 56px);
 }
 
 /* ---- lead ---- */
@@ -683,10 +670,6 @@ body {
   transition: border-color 260ms ease, color 260ms ease;
 }
 
-.about a:hover {
-  border-bottom-color: var(--warm);
-  color: var(--warm);
-}
 
 @media (max-width: 720px) {
   .about__row {
@@ -812,6 +795,40 @@ body {
   }
 }
 
+/* -------------------------------------------------------------- pointer -- */
+
+/*
+ * Every hover state in the piece, and the one place they are switched on.
+ *
+ * A touch browser applies `:hover` on tap and then leaves it applied until
+ * something else is touched — so each control the viewer had used stayed lit
+ * behind them, a highlight with no pointer to explain it. Gating the lot on a
+ * device that actually has one is the whole fix.
+ *
+ * Focus is deliberately not in here. `:focus-visible` is never raised by a tap,
+ * so it costs touch nothing, and gating it would take from keyboard users their
+ * only cue.
+ */
+@media (hover: hover) {
+  .ui__restart:hover,
+  .ui__sound:hover,
+  .ui__about:hover,
+  .about__close:hover {
+    color: var(--ink);
+  }
+
+  .ui__restart:hover::before,
+  .ui__sound:hover::after,
+  .about__close:hover::after {
+    width: clamp(26px, 4.4vw, 56px);
+  }
+
+  .about a:hover {
+    border-bottom-color: var(--warm);
+    color: var(--warm);
+  }
+}
+
 /* ---------------------------------------------------------------- touch -- */
 
 /*
@@ -821,6 +838,20 @@ body {
  * not the number of CSS pixels.
  */
 @media (pointer: coarse) {
+  /*
+   * The grey box a browser flashes over a tapped control is its stand-in for
+   * feedback, and every control here already answers for itself: the sheet
+   * opens, the label flips, the page returns to the top. On a black field it is
+   * the last piece of borrowed chrome.
+   */
+  .ui__restart,
+  .ui__sound,
+  .ui__about,
+  .about__close,
+  .about a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /*
    * The hairline captions are the right size for the piece and the wrong size
    * for a thumb. The padding is transparent, and each control is pulled back by
